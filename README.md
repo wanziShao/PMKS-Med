@@ -1,5 +1,7 @@
 # RelDrug
-Code for the paper "Rule Mining and Relation Completion for Knowledge Graph Enhanced Personalized Drug Recommendation".
+Code for the paper "Distilling Logic-Dense Subgraphs from General-Purpose Medical Knowledge for Drug Recommendation".
+
+The code is being updated gradually.
 
 ## Data Sets
 ### Data Request
