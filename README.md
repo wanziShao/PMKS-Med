@@ -1,5 +1,5 @@
-# RelDrug
-Code for the paper "Distilling Logic-Dense Subgraphs from General-Purpose Medical Knowledge for Drug Recommendation".
+# PMKS-Med
+Code for the paper "PMKS-Med: Patient-specific Medication Knowledge Subgraph Enhanced Medication Recommendation".
 
 The code is being updated gradually.
 
