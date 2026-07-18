@@ -39,6 +39,8 @@ class Mistral(HfCausalModel):
         self.maximun_token = 8192
     
 class Qwen(HfCausalModel):
+    DEFAULT_MODEL_PATH = "Qwen/Qwen3-8B"
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         
@@ -46,11 +48,20 @@ class Qwen(HfCausalModel):
         '''
         Add model-specific prompt to the input
         '''
-        conv = get_conv_template("qwen")
-        conv.append_message(conv.roles[0], query)
-        conv.append_message(conv.roles[1], None)
-        
-        return conv.get_prompt()
+        messages = [{"role": "user", "content": query}]
+        try:
+            return self.tokenizer.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=True,
+                enable_thinking=False,
+            )
+        except TypeError:
+            return self.tokenizer.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=True,
+            )
     
 class Vicuna(HfCausalModel):
     def __init__(self, *args, **kwargs):
