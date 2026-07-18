@@ -220,7 +220,7 @@ if __name__ == "__main__":
     parser.add_argument('--input_folder', default='ranked_rules')
     parser.add_argument("--dataset", default="family")
     parser.add_argument('--output_path', default='pred_results', type=str, help='path to save pred results')
-    parser.add_argument("-p", default='ranked_rules/mimic-iii/gpt-3.5-turbo-top-0-f-5-l-3/none/all', help="rule path")
+    parser.add_argument("-p", default='ranked_rules/mimic-iii/Qwen3-8B-top-0-f-5-l-3/none/all', help="rule path")
     parser.add_argument("--eval_mode", choices=['all', "test", 'fact'], default="all",
                         help="evaluate on all or only test set")
     parser.add_argument('--cpu_num', type=int, default=mp.cpu_count() // 2)
