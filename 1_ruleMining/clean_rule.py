@@ -4,6 +4,7 @@ from data import *
 from utils import *
 import re
 from difflib import get_close_matches
+from llms import get_registed_model
 
 
 def extract_rules(content_list):
@@ -30,7 +31,7 @@ def summarize_rules_prompt(relname, k):
     return prompt
 
 
-def get_valid_rules(input_filepath, output_filepath, valid_response_filepath):
+def get_valid_rules(input_filepath, output_filepath, valid_response_filepath, model):
     with open(input_filepath, "r") as f:
         sum_rule_list = [line.strip() for line in f]
         f.close()
@@ -41,10 +42,10 @@ def get_valid_rules(input_filepath, output_filepath, valid_response_filepath):
     with open(output_filepath, "w") as f1, open(valid_response_filepath, 'w') as f2:
         for sum_rule in sum_rule_list:
             message = valid_prompt + sum_rule
-            response = query(message, model="gpt-4")
+            response = model.generate_sentence(message)
             print(response)
             f2.write("Input Rule: " + sum_rule + "\n")
-            f2.write("GPT-4 Response: \n" + response + '\n')
+            f2.write("Qwen3-8B Response: \n" + response + '\n')
             f2.write("\n=======================================\n")
             if "incorrect" not in response.lower():
                 f1.write(sum_rule + '\n')
@@ -62,7 +63,24 @@ def check_sample_times(content_list):
     return sample_times == 1
 
 
-def summarize_rule(file, args):
+def split_rules_for_model(rule_list, prompt, model):
+    batches = []
+    current_batch = []
+    max_input_tokens = max(1, model.maximun_token - model.args.max_new_tokens)
+    for rule in rule_list:
+        candidate_batch = current_batch + [rule]
+        candidate_prompt = '\n'.join(candidate_batch) + prompt
+        if current_batch and model.token_len(candidate_prompt) > max_input_tokens:
+            batches.append(current_batch)
+            current_batch = [rule]
+        else:
+            current_batch = candidate_batch
+    if current_batch:
+        batches.append(current_batch)
+    return batches
+
+
+def summarize_rule(file, args, model):
     """
     Summarize the rules
     """
@@ -77,14 +95,15 @@ def summarize_rule(file, args):
     if (is_sample_once or args.model == 'none') and not args.force_summarize:  # just return the whole rule_list
         return rule_list
     else:  # Do summarization and correct the spelling error
+        if model is None:
+            raise ValueError("Qwen3-8B is required when rule summarization is enabled")
         summarize_prompt = summarize_rules_prompt(rel_name, args.k)
-        summarize_prompt_len = num_tokens_from_message(summarize_prompt, args.model)
-        list_of_rule_lists = shuffle_split_path_list(rule_list, summarize_prompt_len, args.model)
+        list_of_rule_lists = split_rules_for_model(rule_list, summarize_prompt, model)
         response_list = []
         for rule_list in list_of_rule_lists:
             message = '\n'.join(rule_list) + summarize_prompt
             print('prompt: ', message)
-            response = query(message, model=args.model)
+            response = model.generate_sentence(message)
             response_list.extend(response.split('\n'))
         response_rules = extract_rules(response_list) # Extract rules and remove any explanations from summarized response
             
@@ -187,7 +206,7 @@ def write_clean_rules_to_file(cleaned_rules, output_filepath, all_rels):
                 continue
 
 
-def clean(args):
+def clean(args, LLM=None):
     data_path = os.path.join(args.data_path, args.dataset) + '/'
     dataset = Dataset(data_root=data_path, inv=True)
     rdict = dataset.get_relation_dict()
@@ -196,6 +215,11 @@ def clean(args):
     output_folder = os.path.join(args.output_path, args.dataset, args.p, args.model)
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
+    model = None
+    if LLM is not None:
+        model = LLM(args)
+        print("Prepare Qwen3-8B pipeline for inference...")
+        model.prepare_for_inference()
     for filename in os.listdir(input_folder):
         if filename.endswith(".txt") and "query" not in filename:
             input_filepath = os.path.join(input_folder, filename)
@@ -208,30 +232,54 @@ def clean(args):
                 # Step 1: Summarize rules from the input file
                 print("Start summarize: ", filename)
                 # Summarize rules
-                summarized_rules = summarize_rule(input_filepath, args)
+                summarized_rules = summarize_rule(input_filepath, args, model)
                 print("write file", summarized_filepath)
                 with open(summarized_filepath, "w") as f:
                     f.write('\n'.join(summarized_rules))
 
+            rules_to_clean_filepath = summarized_filepath
+            if args.valid_clean:
+                if model is None:
+                    raise ValueError("Qwen3-8B is required when --valid_clean is enabled")
+                validated_filepath = os.path.join(output_folder, f"{name}_validated_rules.txt")
+                validation_response_filepath = os.path.join(output_folder, f"{name}_validation_responses.txt")
+                get_valid_rules(
+                    summarized_filepath,
+                    validated_filepath,
+                    validation_response_filepath,
+                    model,
+                )
+                rules_to_clean_filepath = validated_filepath
+
             # Step 2: Clean summarized rules and keep format
-            print(f"Clean file {summarized_filepath} with keeping the format")
-            cleaned_rules = clean_rules(summarized_filepath, all_rels)
+            print(f"Clean file {rules_to_clean_filepath} with keeping the format")
+            cleaned_rules = clean_rules(rules_to_clean_filepath, all_rels)
             
             with open(clean_filepath, "w") as f:
                 f.write('\n'.join(cleaned_rules))
             
 
 if __name__ == "__main__":
+    preliminary_parser = argparse.ArgumentParser(add_help=False)
+    preliminary_parser.add_argument('--model', default='none')
+    preliminary_parser.add_argument('--valid_clean', action='store_true')
+    preliminary_parser.add_argument('--force_summarize', action='store_true')
+    preliminary_args, _ = preliminary_parser.parse_known_args()
+
     args = argparse.ArgumentParser()
     args.add_argument('--data_path', type=str, default='datasets', help='data directory')
     args.add_argument("--rule_path", default="gen_rules", type=str, help="path to rule file")
     args.add_argument("--output_path", default="clean_rules", type=str, help="path to output file")
     args.add_argument('--dataset', default='mimic-iii')
-    args.add_argument('--model', default='none', help='model name', choices=['none', 'gpt-4', 'gpt-3.5-turbo', 'gpt-3.5-turbo-16k'])
-    args.add_argument('-p', default='gpt-3.5-turbo-top-0-f-5-l-3', help='rule prefix')
+    args.add_argument('--model', default='none', help='model name', choices=['none', 'Qwen3-8B'])
+    args.add_argument('-p', default='Qwen3-8B-top-0-f-5-l-3', help='rule prefix')
     args.add_argument('-k', type=int, default=0, help='Number of summarized rules')
     args.add_argument('--clean_only', action='store_true', help='Load summarized rules then clean rules only')
-    args.add_argument('--valid_clean', action='store_true', help='gpt-4 validation for rules')
+    args.add_argument('--valid_clean', action='store_true', help='Qwen3-8B validation for rules')
     args.add_argument('--force_summarize', action='store_true', help='force summarize rules')
+    needs_llm = preliminary_args.model != 'none' or preliminary_args.valid_clean or preliminary_args.force_summarize
+    LLM = get_registed_model('Qwen3-8B') if needs_llm else None
+    if LLM is not None:
+        LLM.add_args(args)
     args = args.parse_args()
-    clean(args)
+    clean(args, LLM)
