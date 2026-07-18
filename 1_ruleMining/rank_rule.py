@@ -129,7 +129,7 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset", default="mimic-iii")
-    parser.add_argument("-p", default="clean_rules/mimic-ii/gpt-3.5-turbo-top-0-f-5-l-3/none")
+    parser.add_argument("-p", default="clean_rules/mimic-ii/Qwen3-8B-top-0-f-5-l-3/none")
     parser.add_argument("--eval_mode", choices=['all', "test", 'fact'], default="all", help="evaluate on all or only test set")
     parser.add_argument("--input_path", default="clean_rules", type=str, help="input folder")
     parser.add_argument("--output_path", default="ranked_rules", type=str, help="path to output file")
