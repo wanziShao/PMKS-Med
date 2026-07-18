@@ -90,7 +90,7 @@ def generate_rule(row, candidate_rels, rule_path, model, args):
             f.write(current_prompt + "\n")
             f.close()
         if not args.dry_run:
-            response = query(current_prompt, model=args.model_name)
+            response = model.generate_sentence(current_prompt)
             with open(os.path.join(rule_path, f"{head}_zero_shot.txt"), "w") as f:
                 f.write(response + "\n")
                 f.close()
@@ -160,6 +160,10 @@ def main(args, LLM):
 
 
 if __name__ == "__main__":
+    preliminary_parser = argparse.ArgumentParser(add_help=False)
+    preliminary_parser.add_argument("--model_name", type=str, default="Qwen3-8B")
+    preliminary_args, _ = preliminary_parser.parse_known_args()
+
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--data_path", type=str, default="datasets", help="data directory"
@@ -171,7 +175,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--rule_path", type=str, default="gen_rules", help="path to rule file"
     )
-    parser.add_argument("--model_name", type=str, default="gpt-3.5-turbo", help="model name")
+    parser.add_argument("--model_name", type=str, default="Qwen3-8B", help="model name")
     parser.add_argument(
         "--is_zero",
         action="store_true",
@@ -184,15 +188,14 @@ if __name__ == "__main__":
         help="Number of generated rules, 0 denotes as much as possible",
     )
     parser.add_argument("-f", type=int, default=5, help="Few-shot number")
-    parser.add_argument("-n", type=int, default=5, help="multi thread number")
+    parser.add_argument("-n", type=int, default=1, help="multi thread number")
     parser.add_argument(
         "-l", type=int, default=3, help="sample l times for generating k rules"
     )
     parser.add_argument("--prefix", type=str, default="", help="prefix")
     parser.add_argument("--dry_run", action="store_true", help="dry run")
 
-    args, _ = parser.parse_known_args()
-    LLM = get_registed_model(args.model_name)
+    LLM = get_registed_model(preliminary_args.model_name)
     LLM.add_args(parser)
     args = parser.parse_args()
 
