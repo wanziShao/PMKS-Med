@@ -29,7 +29,7 @@ Next, we will take mimic-iii as an example to introduce how to run the code.
 
 Run the following commands in sequence.
 
-### LLM-based Rule Mining and Task-driven Personalized Subgraph Construction
+### LLM-Guided Rule Mining and PMKS Construction
 ```
 cd 1_ruleMining
 python preprocess.py
@@ -40,13 +40,13 @@ python rank_rule.py --dataset mimic-iii -p clean_rules/mimic-iii/Qwen3-8B/none
 python gen_kg.py
 ```
 
-### Deep Learning-Based Drug Probability Prediction with EHRs and KG
+### Base Medication Prediction with EHRs and PMKS
 ```
 cd ../2_deepModelDrugRec
 python main.py
 ```
 
-### Drug Likelihood Probability Calibration Based on Large Language Model
+### PMKS-Guided Probability Refinement with LLMs
 ```
 cd ../3_probabilityCalibration
 python sample-triples.py
